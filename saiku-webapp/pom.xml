@@ -133,6 +133,11 @@
 			<artifactId>saiku-web</artifactId>
 			<version>${project.version}</version>
 		</dependency>
+		<dependency>
+			<groupId>pt.webdetails</groupId>
+			<artifactId>cda-core</artifactId>
+			<version>TRUNK-SNAPSHOT</version>
+		</dependency>
 		<!-- Spring modules -->
 		<dependency>
 			<groupId>org.springframework</groupId>

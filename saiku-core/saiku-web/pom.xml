@@ -83,6 +83,19 @@
 			<artifactId>log4j</artifactId>
 			<version>1.2.14</version>
 		</dependency>
+		
+		<dependency>
+			<groupId>pt.webdetails</groupId>
+			<artifactId>cda-core</artifactId>
+			<version>TRUNK-SNAPSHOT</version>
+		</dependency>
+		<dependency>
+    		<groupId>pentaho-library</groupId>
+    		<artifactId>libloader</artifactId>
+    		<version>1.2.5</version>
+		</dependency>
+		
+		
 		<!-- Spring modules -->
 <dependency>
   <groupId>org.springframework</groupId>
