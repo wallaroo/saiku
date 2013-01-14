@@ -16,6 +16,7 @@
 package org.saiku.olap.util;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 import org.olap4j.Axis;
@@ -114,6 +115,7 @@ public class ObjectUtil {
 					level.getName(), 
 					level.getUniqueName(), 
 					level.getCaption(), 
+					level.getDescription(),
 					level.getDimension().getUniqueName(), 
 					level.getHierarchy().getUniqueName(),
 					level.isVisible());
@@ -123,7 +125,7 @@ public class ObjectUtil {
 		}
 	}
 
-	public static List<SaikuMember> convertMembers(List<Member> members) {
+	public static List<SaikuMember> convertMembers(Collection<Member> members) {
 		List<SaikuMember> memberList= new ArrayList<SaikuMember>();
 		for (Member l : members) {
 			memberList.add(convert(l));

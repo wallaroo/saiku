@@ -28,8 +28,10 @@ import org.olap4j.metadata.Property;
 import org.saiku.olap.dto.resultset.DataCell;
 import org.saiku.olap.dto.resultset.Matrix;
 import org.saiku.olap.dto.resultset.MemberCell;
+import org.saiku.olap.util.SaikuProperties;
 
 import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.util.*;
 
 
@@ -343,7 +345,10 @@ public class FlattenedCellSetFormatter implements ICellSetFormatter {
 					cellValue = ""; //$NON-NLS-1$
 				else {
 					try {
-						DecimalFormat myFormatter = new DecimalFormat("#,###.###"); //$NON-NLS-1$
+						// TODO this needs to become query / execution specific
+						DecimalFormat myFormatter = new DecimalFormat(SaikuProperties.formatDefautNumberFormat); //$NON-NLS-1$
+						DecimalFormatSymbols dfs = new DecimalFormatSymbols(SaikuProperties.locale);
+						myFormatter.setDecimalFormatSymbols(dfs);
 						String output = myFormatter.format(cell.getValue());
 						cellValue = output;
 					}
@@ -482,19 +487,19 @@ public class FlattenedCellSetFormatter implements ICellSetFormatter {
 //						memberInfo.setProperty(values.get(j).getCaption(), val);
 //					}
 
-					if (y > 0) {
-						for (int previ = y-1; previ >= 0;previ--) {
-							if(prevMembers[previ] != null) {
-								memberInfo.setRightOf(prevMemberInfo[previ]);
-								memberInfo.setRightOfDimension(prevMembers[previ].getDimension().getName());
-								previ = -1;
-							}
-						}
-					}
+//					if (y > 0) {
+//						for (int previ = y-1; previ >= 0;previ--) {
+//							if(prevMembers[previ] != null) {
+//								memberInfo.setRightOf(prevMemberInfo[previ]);
+//								memberInfo.setRightOfDimension(prevMembers[previ].getDimension().getName());
+//								previ = -1;
+//							}
+//						}
+//					}
 
 
-					if (member.getParentMember() != null)
-						memberInfo.setParentMember(member.getParentMember().getUniqueName());
+//					if (member.getParentMember() != null)
+//						memberInfo.setParentMember(member.getParentMember().getUniqueName());
 
 				} else {
 					memberInfo.setRawValue(null);
