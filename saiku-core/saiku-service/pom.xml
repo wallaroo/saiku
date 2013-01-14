@@ -115,6 +115,12 @@
             <artifactId>poi</artifactId>
             <version>3.6</version>
         </dependency>
+        <dependency>
+            <groupId>commons-collections</groupId>
+            <artifactId>commons-collections</artifactId>
+            <version>3.2</version>
+            <scope>compile</scope>
+        </dependency>
         
         <dependency>
             <groupId>eigenbase</groupId>
