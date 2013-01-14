@@ -59,16 +59,8 @@
                 <Column name='store_id'/>
             </ForeignKey>
         </Link>
-        <Table name='product'>
-            <Key>
-                <Column name='product_id'/>
-            </Key>
-        </Table>
-        <Table name='product_class'>
-            <Key>
-                <Column name='product_class_id'/>
-            </Key>
-        </Table>
+        <Table name='product' keyColumn='product_id'/>
+        <Table name='product_class' keyColumn='product_class_id'/>
         <Link target='product' source='product_class'>
             <ForeignKey>
                 <Column name='product_class_id'/>
@@ -152,16 +144,6 @@
             </Key>
         </Table>
 
-        <!-- Dummy table for Scenario hanger dimension. -->
-        <InlineTable alias='foo'>
-          <ColumnDefs>
-            <ColumnDef name='bar' type='Numeric'/>
-          </ColumnDefs>
-          <Key>
-              <Column name='bar'/>
-          </Key>
-          <Rows/>
-        </InlineTable>
         <Table name='agg_c_special_sales_fact_1997'/>
         <Table name='agg_pl_01_sales_fact_1997'/>
         <Table name='agg_l_05_sales_fact_1997'/>
@@ -385,6 +367,7 @@
         <Annotations>
             <Annotation name='caption.de_DE'>Verkaufen</Annotation>
             <Annotation name='caption.fr_FR'>Ventes</Annotation>
+            <Annotation name='caption+fr_FR'>Ventes</Annotation>
             <Annotation name='description.fr_FR'>Cube des ventes</Annotation>
             <Annotation name='description.de'>Cube Verkaufen</Annotation>
             <Annotation name='description.de_AT'>Cube den Verkaufen</Annotation>
@@ -771,9 +754,7 @@
             <Dimension name='Employee' key='Employee Id'>
                 <Attributes>
                     <Attribute name='Manager Id' table='employee' keyColumn='supervisor_id'/>
-                    <Attribute name='Employee Id' table='employee' keyColumn='employee_id' nameColumn='full_name' orderByColumn='employee_id' parent='Manager Id' nullParentValue='0'>
-                        <Closure table='employee_closure' parentColumn='supervisor_id' childColumn='employee_id'/>
-                    </Attribute>
+                    <Attribute name='Employee Id' table='employee' keyColumn='employee_id' nameColumn='full_name' orderByColumn='employee_id'/>
                     <Attribute name='Store Id' table='employee' keyColumn='store_id'/>
                     <Attribute name='Store Type' table='store' keyColumn='store_type' hierarchyAllMemberName='All Store Types'/>
                     <Attribute name='Pay Type' table='position' keyColumn='pay_type' hierarchyAllMemberName='All Pay Types'/>
@@ -797,7 +778,9 @@
                 </Attributes>
                 <Hierarchies>
                     <Hierarchy name='Employees' allMemberName='All Employees'>
-                        <Level attribute='Employee Id'/>
+                        <Level attribute='Employee Id' parentAttribute='Manager Id' nullParentValue='0'>
+                            <Closure table='employee_closure' parentColumn='supervisor_id' childColumn='employee_id'/>
+                        </Level>
                     </Hierarchy>
                     <Hierarchy name='Position' allMemberName='All Position'>
                         <Level attribute='Management Role'/>
@@ -805,6 +788,7 @@
                     </Hierarchy>
                 </Hierarchies>
             </Dimension>
+
             <Dimension name='Department' table='department' key='Department Description'>
                 <Attributes>
                     <Attribute name='Department Description' keyColumn='department_id'/>
@@ -815,7 +799,44 @@
                     </Hierarchy>
                 </Hierarchies>
             </Dimension>
-            <Dimension source='Time'/>
+            <!-- Use private "Time" dimension because key is different than public
+                 "Time" dimension. -->
+            <Dimension name='Time' table='time_by_day' type='TIME' key='Time Id'>
+                <Attributes>
+                    <Attribute name='Year' keyColumn='the_year' levelType='TimeYears' hasHierarchy='false'/>
+                    <Attribute name='Quarter' levelType='TimeQuarters' hasHierarchy='false'>
+                        <Key>
+                            <Column name='the_year'/>
+                            <Column name='quarter'/>
+                        </Key>
+                        <Name>
+                            <Column name='quarter'/>
+                        </Name>
+                    </Attribute>
+                    <!-- Use the_month as source for the name, so members look like
+                        [Time].[1997].[Q1].[Jan] rather than [Time].[1997].[Q1].[1]. -->
+                    <Attribute name='Month' hasHierarchy='false'>
+                        <Key>
+                            <Column name='the_year'/>
+                            <Column name='month_of_year'/>
+                        </Key>
+                        <Name>
+                            <Column name='the_month'/>
+                        </Name>
+                    </Attribute>
+                    <Attribute name='Date' keyColumn='the_date' hasHierarchy='false'/>
+                    <Attribute name='Time Id' keyColumn='time_id' hasHierarchy='false'/>
+                </Attributes>
+
+                <Hierarchies>
+                    <Hierarchy name='Time' hasAll='false'>
+                        <Level attribute='Year'/>
+                        <Level attribute='Quarter'/>
+                        <Level attribute='Month'/>
+                    </Hierarchy>
+                </Hierarchies>
+            </Dimension>
+
             <Dimension source='Store'/>
         </Dimensions>
 

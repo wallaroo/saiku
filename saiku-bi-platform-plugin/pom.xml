@@ -170,22 +170,27 @@
 								<artifactItem>
 									<groupId>eigenbase</groupId>
 									<artifactId>eigenbase-properties</artifactId>
-									<version>1.1.0.10924</version>
+									<version>1.1.2</version>
 									<outputDirectory>target/dist/saiku/lib</outputDirectory>
 								</artifactItem>
 								<artifactItem>
 									<groupId>eigenbase</groupId>
 									<artifactId>eigenbase-resgen</artifactId>
-									<version>1.3.0.11873</version>
+									<version>1.3.1</version>
 									<outputDirectory>target/dist/saiku/lib</outputDirectory>
-
 								</artifactItem>
 								<artifactItem>
 									<groupId>eigenbase</groupId>
 									<artifactId>eigenbase-xom</artifactId>
-									<version>1.3.0.11999</version>
+									<version>1.3.1</version>
 									<outputDirectory>target/dist/saiku/lib</outputDirectory>
 								</artifactItem>
+                                <artifactItem>
+                                    <groupId>org.apache.commons</groupId>
+                                    <artifactId>commons-vfs2</artifactId>
+                                    <version>2.0</version>
+                                    <outputDirectory>target/dist/saiku/lib</outputDirectory>
+                                </artifactItem>
 								<artifactItem>
 									<groupId>commons-lang</groupId>
 									<artifactId>commons-lang</artifactId>
@@ -335,21 +340,42 @@
 			<artifactId>mondrian</artifactId>
 			<version>4.0.0-SNAPSHOT</version>
 		</dependency>
-		<dependency>
-			<groupId>eigenbase</groupId>
-			<artifactId>eigenbase-properties</artifactId>
-			<version>1.1.0.10924</version>
-		</dependency>
-		<dependency>
-			<groupId>eigenbase</groupId>
-			<artifactId>eigenbase-resgen</artifactId>
-			<version>1.3.0.11873</version>
-		</dependency>
-		<dependency>
-			<groupId>eigenbase</groupId>
-			<artifactId>eigenbase-xom</artifactId>
-			<version>1.3.0.11999</version>
-		</dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-vfs2</artifactId>
+            <version>2.0</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>net.java.dev.javacc</groupId>
+            <artifactId>javacc</artifactId>
+            <version>5.0</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>eigenbase</groupId>
+            <artifactId>eigenbase-xom</artifactId>
+            <version>1.3.1</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>eigenbase</groupId>
+            <artifactId>eigenbase-properties</artifactId>
+            <version>1.1.2</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>eigenbase</groupId>
+            <artifactId>eigenbase-resgen</artifactId>
+            <version>1.3.1</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-vfs2</artifactId>
+            <version>2.0</version>
+            <scope>compile</scope>
+        </dependency>
 		<dependency>
 			<groupId>org.olap4j</groupId>
 			<artifactId>olap4j-xmla</artifactId>
