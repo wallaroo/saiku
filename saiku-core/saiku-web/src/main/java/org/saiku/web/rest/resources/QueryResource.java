@@ -16,6 +16,7 @@
 package org.saiku.web.rest.resources;
 
 import java.io.StringReader;
+import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -50,6 +51,7 @@ import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.map.type.TypeFactory;
 import org.saiku.olap.dto.SaikuCube;
 import org.saiku.olap.dto.SaikuDimensionSelection;
+import org.saiku.olap.dto.SaikuMember;
 import org.saiku.olap.dto.SaikuQuery;
 import org.saiku.olap.dto.SaikuTag;
 import org.saiku.olap.dto.resultset.CellDataSet;
@@ -425,6 +427,32 @@ public class QueryResource {
 			return new QueryResult(error);
 		}
 	}
+	
+	@GET
+	@Produces({"application/json" })
+	@Path("/{queryname}/result/metadata/dimensions/{dimension}/hierarchies/{hierarchy}/levels/{level}")
+	public Response getLevelMembers(
+			@PathParam("queryname") String queryName, 
+			@PathParam("dimension") String dimensionName, 
+			@PathParam("hierarchy") String hierarchyName,
+			@PathParam("level") String levelName,
+			@QueryParam("result") @DefaultValue("true") boolean result)
+	{
+		if (log.isDebugEnabled()) {
+			log.debug("TRACK\t" 
+					+ "\t/query/" + queryName + "/result/metadata/dimensions/" + dimensionName 
+					+ "/hierarchies/" + hierarchyName + "/levels/" + levelName + "\tGET");
+		}
+		try {
+			List<SaikuMember> ms = olapQueryService.getResultMetadataMembers(queryName, result, dimensionName, hierarchyName, levelName);
+			return Response.ok(ms).build();
+		}
+		catch (Exception e) {
+			log.error("Cannot execute query (" + queryName + ")",e);
+			String error = ExceptionUtils.getRootCauseMessage(e);
+			return Response.serverError().entity(error).build();
+		}
+	}
 
 	@POST
 	@Produces({"application/json" })
@@ -515,13 +543,21 @@ public class QueryResource {
 		}
 		finally {
 			if (rs != null) {
+				Statement statement = null;
+				Connection con = null;
 				try {
-					Statement statement = rs.getStatement();
-					statement.close();
-					rs.close();
-				} catch (SQLException e) {
+					 statement = rs.getStatement();
+					 con = rs.getStatement().getConnection();
+				} catch (Exception e) {
 					throw new SaikuServiceException(e);
 				} finally {
+					try {
+						rs.close();
+						if (statement != null) {
+							statement.close();
+						}
+					} catch (Exception ee) {};
+
 					rs = null;
 				}
 			}
@@ -1071,6 +1107,62 @@ public class QueryResource {
 			log.debug("TRACK\t"  + "\t/query/" + queryName + "/axis/"+axisName+"/sort/\tDELETE");
 		}
 		olapQueryService.clearSort(queryName, axisName);
+	}
+	
+	@POST
+	@Produces({"application/json" })
+	@Path("/{queryname}/axis/{axis}/limit/{limitfunction}")
+	public void limitAxis(
+			@PathParam("queryname") String queryName, 
+			@PathParam("axis") String axisName,
+			@PathParam("limitfunction") String limitfunction,
+			@FormParam("n") String n,
+			@FormParam("sortliteral") String sortLiteral)
+	{
+		if (log.isDebugEnabled()) {
+			log.debug("TRACK\t"  + "\t/query/" + queryName + "/axis/"+axisName+"/limit/" + limitfunction+ "(" + n  + ", sort:"+ sortLiteral +"\tPOST");
+		}
+		olapQueryService.limitAxis(queryName, axisName, limitfunction, n, sortLiteral);
+	}
+	
+	@DELETE
+	@Produces({"application/json" })
+	@Path("/{queryname}/axis/{axis}/limit")
+	public void clearLimitAxis(
+			@PathParam("queryname") String queryName, 
+			@PathParam("axis") String axisName)
+	{
+		if (log.isDebugEnabled()) {
+			log.debug("TRACK\t"  + "\t/query/" + queryName + "/axis/"+axisName+"/limit/\tDELETE");
+		}
+		olapQueryService.clearLimit(queryName, axisName);
+	}
+
+	@POST
+	@Produces({"application/json" })
+	@Path("/{queryname}/axis/{axis}/filter")
+	public void filterAxis(
+			@PathParam("queryname") String queryName, 
+			@PathParam("axis") String axisName,
+			@FormParam("filterCondition") String filterCondition)
+	{
+		if (log.isDebugEnabled()) {
+			log.debug("TRACK\t"  + "\t/query/" + queryName + "/axis/"+axisName+"/filter/ (" + filterCondition +" )\tPOST");
+		}
+		olapQueryService.filterAxis(queryName, axisName, filterCondition);
+	}
+	
+	@DELETE
+	@Produces({"application/json" })
+	@Path("/{queryname}/axis/{axis}/filter")
+	public void ckearFilter(
+			@PathParam("queryname") String queryName, 
+			@PathParam("axis") String axisName)
+	{
+		if (log.isDebugEnabled()) {
+			log.debug("TRACK\t"  + "\t/query/" + queryName + "/axis/"+axisName+"/filter/\tDELETE");
+		}
+		olapQueryService.clearFilter(queryName, axisName);
 	}
 
 }

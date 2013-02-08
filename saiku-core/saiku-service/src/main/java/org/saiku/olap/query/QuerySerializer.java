@@ -182,6 +182,25 @@ public class QuerySerializer {
             axisElement.setAttribute("sortEvaluationLiteral", axis.getSortIdentifierNodeName());
         }
         
+        try {
+        	if (axis.getLimitFunction() != null) {
+                axisElement.setAttribute("limitFunction", axis.getLimitFunction().toString());
+            }
+            
+            if (axis.getLimitFunctionN() != null) {
+                axisElement.setAttribute("limitFunctionN", axis.getLimitFunctionN().toPlainString());
+            }
+            
+            if (StringUtils.isNotBlank(axis.getLimitFunctionSortLiteral())) {
+                axisElement.setAttribute("limitFunctionSortLiteral", axis.getLimitFunctionSortLiteral());
+            }
+            
+            if (StringUtils.isNotBlank(axis.getFilterCondition())) {
+            	axisElement.setAttribute("filterCondition", axis.getFilterCondition());
+            }
+            
+        } catch (Error e) {};
+        
         Element dimensions = new Element("Dimensions");
         
         

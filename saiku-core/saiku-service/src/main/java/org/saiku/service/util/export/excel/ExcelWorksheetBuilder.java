@@ -1,23 +1,36 @@
 package org.saiku.service.util.export.excel;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+
 import org.apache.poi.hssf.usermodel.HSSFCellStyle;
 import org.apache.poi.hssf.usermodel.HSSFPalette;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.hssf.util.HSSFColor;
-import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.DataFormat;
+import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.saiku.olap.dto.SaikuDimensionSelection;
 import org.saiku.olap.dto.SaikuSelection;
 import org.saiku.olap.dto.resultset.AbstractBaseCell;
 import org.saiku.olap.dto.resultset.CellDataSet;
 import org.saiku.olap.dto.resultset.DataCell;
+import org.saiku.olap.util.SaikuProperties;
 import org.saiku.service.util.exception.SaikuServiceException;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.text.SimpleDateFormat;
-import java.util.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Created with IntelliJ IDEA.
@@ -51,6 +64,8 @@ public class ExcelWorksheetBuilder {
     HSSFPalette customColorsPalette;
     int nextAvailableColorCode = 41;
     Properties cssColorCodesProperties;
+    
+    private static final Logger log = LoggerFactory.getLogger(ExcelWorksheetBuilder.class);
 
     public ExcelWorksheetBuilder(CellDataSet table, List<SaikuDimensionSelection> filters, String sheetName) {
 
@@ -88,6 +103,17 @@ public class ExcelWorksheetBuilder {
         numberCS.setFont(font);
         numberCS.setAlignment(CellStyle.ALIGN_RIGHT);
         setCellBordersColor(numberCS);
+        /* 
+        justasg:
+            Let's set default format, used if measure has no format at all.
+            More info: http://poi.apache.org/apidocs/org/apache/poi/ss/usermodel/BuiltinFormats.html#getBuiltinFormat(int)
+            If we don't have default format, it will output values up to maximum detail, i.e. 121212.3456789
+            and we like them as 121,212.346
+        */ 
+        DataFormat fmt = excelWorkbook.createDataFormat();
+        short dataFormat = fmt.getFormat(SaikuProperties.webExportExcelDefaultNumberFormat);
+        numberCS.setDataFormat(dataFormat);
+        
 
         Font headerFont = excelWorkbook.createFont();
         headerFont.setFontHeightInPoints((short) BASIC_SHEET_FONT_SIZE);
@@ -155,9 +181,11 @@ public class ExcelWorksheetBuilder {
 
     private int initExcelSheet() {
 
-        initSummarySheet();
+        
         // Main Workbook Sheet
         workbookSheet = excelWorkbook.createSheet(this.sheetName);
+    
+        initSummarySheet();
 
         return 0;
     }
@@ -244,12 +272,18 @@ public class ExcelWorksheetBuilder {
     protected void applyCellFormatting(Cell cell, int x, int y) {
         String formatString;
         formatString = ((DataCell) rowsetBody[x][y]).getFormatString();
-        if (formatString != null) {
+        if ((formatString != null) && (formatString.trim().length() > 0)) {
             // Inherit formatting from cube schema FORMAT_STRING
             CellStyle numberCSClone = excelWorkbook.createCellStyle();
-            DataFormat fmt = excelWorkbook.createDataFormat();
             numberCSClone.cloneStyleFrom(numberCS);
-            numberCSClone.setDataFormat(fmt.getFormat(formatString));
+            DataFormat fmt = excelWorkbook.createDataFormat();
+            
+            // the format string can contain macro values such as "Standard" from mondrian.util.Format
+            // try and look it up, otherwise use the given one
+            formatString = FormatUtil.getFormatString(formatString);
+            short dataFormat = fmt.getFormat(formatString);
+            numberCSClone.setDataFormat(dataFormat);
+
             // Check for cell background
             Map<String, String> properties = ((DataCell) rowsetBody[x][y]).getProperties();
             if (properties.containsKey("style")) {

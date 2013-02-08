@@ -16,8 +16,10 @@
 package org.saiku.olap.util;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
+import org.apache.commons.lang.StringUtils;
 import org.olap4j.Axis;
 import org.olap4j.OlapException;
 import org.olap4j.metadata.Dimension;
@@ -114,6 +116,7 @@ public class ObjectUtil {
 					level.getName(), 
 					level.getUniqueName(), 
 					level.getCaption(), 
+					level.getDescription(),
 					level.getDimension().getUniqueName(), 
 					level.getHierarchy().getUniqueName(),
 					level.isVisible());
@@ -123,7 +126,7 @@ public class ObjectUtil {
 		}
 	}
 
-	public static List<SaikuMember> convertMembers(List<Member> members) {
+	public static List<SaikuMember> convertMembers(Collection<Member> members) {
 		List<SaikuMember> memberList= new ArrayList<SaikuMember>();
 		for (Member l : members) {
 			memberList.add(convert(l));
@@ -198,13 +201,27 @@ public class ObjectUtil {
 		List<SaikuDimensionSelection> dims = ObjectUtil.convertDimensionSelections(axis.getDimensions());
 		Axis location = axis.getLocation();
 		String so = axis.getSortOrder() == null? null : axis.getSortOrder().name();
-		return new SaikuAxis(
+		SaikuAxis sax = new SaikuAxis(
 				location.name(),
 				location.axisOrdinal(),
 				axis.getName(),
 				dims,
 				so,
 				axis.getSortIdentifierNodeName());
+		
+		try {
+			if (axis.getLimitFunction() != null) {
+				sax.setLimitFunction(axis.getLimitFunction().toString());
+				sax.setLimitFunctionN(axis.getLimitFunctionN().toPlainString());
+				sax.setLimitFunctionSortLiteral(axis.getLimitFunctionSortLiteral());
+			}
+			if (StringUtils.isNotBlank(axis.getFilterCondition())) {
+				sax.setFilterCondition(axis.getFilterCondition());
+			}
+		} catch (Error e) {}
+		
+		
+		return sax;
 	}
 	
 	public static SaikuQuery convert(IQuery q) {
