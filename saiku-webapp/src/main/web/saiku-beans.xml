@@ -87,4 +87,7 @@
 	</bean>
 
 
+	<bean id="cdaResource" scope="request" 	class="org.saiku.web.rest.resources.CdaResource" >
+	</bean>
+
 </beans>
