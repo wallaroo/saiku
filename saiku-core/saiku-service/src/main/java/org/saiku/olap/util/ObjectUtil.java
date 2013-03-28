@@ -19,11 +19,13 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import org.apache.commons.lang.StringUtils;
 import org.olap4j.Axis;
 import org.olap4j.OlapException;
 import org.olap4j.metadata.Dimension;
 import org.olap4j.metadata.Hierarchy;
 import org.olap4j.metadata.Level;
+import org.olap4j.metadata.Measure;
 import org.olap4j.metadata.Member;
 import org.olap4j.query.QueryAxis;
 import org.olap4j.query.QueryDimension;
@@ -33,6 +35,7 @@ import org.saiku.olap.dto.SaikuDimension;
 import org.saiku.olap.dto.SaikuDimensionSelection;
 import org.saiku.olap.dto.SaikuHierarchy;
 import org.saiku.olap.dto.SaikuLevel;
+import org.saiku.olap.dto.SaikuMeasure;
 import org.saiku.olap.dto.SaikuMember;
 import org.saiku.olap.dto.SaikuQuery;
 import org.saiku.olap.dto.SaikuSelection;
@@ -178,6 +181,20 @@ public class ObjectUtil {
 				m.getLevel().getUniqueName());
 	}
 	
+	public static SaikuMember convertMeasure(Measure m) {
+		return new SaikuMeasure(
+				m.getName(), 
+				m.getUniqueName(), 
+				m.getCaption(), 
+				m.getDescription(),
+				m.getDimension().getUniqueName(),
+				m.getHierarchy().getUniqueName(),
+				m.getLevel().getUniqueName(),
+				m.isCalculated() | m.isCalculatedInQuery());
+
+	}
+
+	
 	public static SaikuDimensionSelection convertDimensionSelection(QueryDimension dim) {
 		List<SaikuSelection> selections = ObjectUtil.convertSelections(dim.getInclusions());
 		return new SaikuDimensionSelection(
@@ -200,13 +217,27 @@ public class ObjectUtil {
 		List<SaikuDimensionSelection> dims = ObjectUtil.convertDimensionSelections(axis.getDimensions());
 		Axis location = axis.getLocation();
 		String so = axis.getSortOrder() == null? null : axis.getSortOrder().name();
-		return new SaikuAxis(
+		SaikuAxis sax = new SaikuAxis(
 				location.name(),
 				location.axisOrdinal(),
 				axis.getName(),
 				dims,
 				so,
 				axis.getSortIdentifierNodeName());
+		
+		try {
+			if (axis.getLimitFunction() != null) {
+				sax.setLimitFunction(axis.getLimitFunction().toString());
+				sax.setLimitFunctionN(axis.getLimitFunctionN().toPlainString());
+				sax.setLimitFunctionSortLiteral(axis.getLimitFunctionSortLiteral());
+			}
+			if (StringUtils.isNotBlank(axis.getFilterCondition())) {
+				sax.setFilterCondition(axis.getFilterCondition());
+			}
+		} catch (Error e) {}
+		
+		
+		return sax;
 	}
 	
 	public static SaikuQuery convert(IQuery q) {

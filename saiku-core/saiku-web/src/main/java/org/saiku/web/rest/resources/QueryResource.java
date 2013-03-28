@@ -16,6 +16,7 @@
 package org.saiku.web.rest.resources;
 
 import java.io.StringReader;
+import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -44,6 +45,7 @@ import javax.ws.rs.core.Response.Status;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.codehaus.jackson.annotate.JsonAutoDetect.Visibility;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -67,6 +69,7 @@ import org.saiku.web.rest.objects.SavedQuery;
 import org.saiku.web.rest.objects.SelectionRestObject;
 import org.saiku.web.rest.objects.resultset.QueryResult;
 import org.saiku.web.rest.util.RestUtil;
+import org.saiku.web.svg.PdfReport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -329,6 +332,65 @@ public class QueryResource {
 			return Response.serverError().build();
 		}
 	}
+	
+
+
+	@POST
+	@Produces({"application/pdf" })
+	@Path("/{queryname}/export/pdf")
+	public Response exportPdfWithChart(
+			@PathParam("queryname")  String queryName,
+			@PathParam("svg")  @DefaultValue("") String svg)
+	{
+		return exportPdfWithChartAndFormat(queryName, null, svg);
+	}
+		
+	@GET
+	@Produces({"application/pdf" })
+	@Path("/{queryname}/export/pdf")
+	public Response exportPdf(@PathParam("queryname")  String queryName)
+	{
+		return exportPdfWithChartAndFormat(queryName, null, null);
+	}
+
+	@GET
+	@Produces({"application/pdf" })
+	@Path("/{queryname}/export/pdf/{format}")
+	public Response exportPdfWithFormat(
+			@PathParam("queryname")  String queryName,
+			@PathParam("format") String format)
+	{
+		return exportPdfWithChartAndFormat(queryName, format, null);
+	}
+	
+	@POST
+	@Produces({"application/pdf" })
+	@Path("/{queryname}/export/pdf/{format}")
+	public Response exportPdfWithChartAndFormat(
+			@PathParam("queryname")  String queryName,
+			@PathParam("format") String format,
+			@FormParam("svg") @DefaultValue("") String svg)
+	{
+		
+		try {
+			PdfReport pdf = new PdfReport();
+			CellDataSet cs = null;
+			if (StringUtils.isNotBlank(format)) {
+				cs = olapQueryService.execute(queryName, format);
+			} else {
+				cs = olapQueryService.execute(queryName);
+			}
+			
+			byte[] doc  = pdf.pdf(cs, svg);
+			return Response.ok(doc).type("application/pdf").header(
+					"content-disposition",
+					"attachment; filename = export.pdf").header(
+							"content-length",doc.length).build();
+		} catch (Exception e) {
+			log.error("Error exporting query to  PDF", e);
+			return Response.serverError().entity(e.getMessage()).status(Status.INTERNAL_SERVER_ERROR).build();
+		}
+	}
 
 	@DELETE
 	@Path("/{queryname}/result")
@@ -542,13 +604,21 @@ public class QueryResource {
 		}
 		finally {
 			if (rs != null) {
+				Statement statement = null;
+				Connection con = null;
 				try {
-					Statement statement = rs.getStatement();
-					statement.close();
-					rs.close();
-				} catch (SQLException e) {
+					 statement = rs.getStatement();
+					 con = rs.getStatement().getConnection();
+				} catch (Exception e) {
 					throw new SaikuServiceException(e);
 				} finally {
+					try {
+						rs.close();
+						if (statement != null) {
+							statement.close();
+						}
+					} catch (Exception ee) {};
+
 					rs = null;
 				}
 			}
@@ -1098,6 +1168,62 @@ public class QueryResource {
 			log.debug("TRACK\t"  + "\t/query/" + queryName + "/axis/"+axisName+"/sort/\tDELETE");
 		}
 		olapQueryService.clearSort(queryName, axisName);
+	}
+	
+	@POST
+	@Produces({"application/json" })
+	@Path("/{queryname}/axis/{axis}/limit/{limitfunction}")
+	public void limitAxis(
+			@PathParam("queryname") String queryName, 
+			@PathParam("axis") String axisName,
+			@PathParam("limitfunction") String limitfunction,
+			@FormParam("n") String n,
+			@FormParam("sortliteral") String sortLiteral)
+	{
+		if (log.isDebugEnabled()) {
+			log.debug("TRACK\t"  + "\t/query/" + queryName + "/axis/"+axisName+"/limit/" + limitfunction+ "(" + n  + ", sort:"+ sortLiteral +"\tPOST");
+		}
+		olapQueryService.limitAxis(queryName, axisName, limitfunction, n, sortLiteral);
+	}
+	
+	@DELETE
+	@Produces({"application/json" })
+	@Path("/{queryname}/axis/{axis}/limit")
+	public void clearLimitAxis(
+			@PathParam("queryname") String queryName, 
+			@PathParam("axis") String axisName)
+	{
+		if (log.isDebugEnabled()) {
+			log.debug("TRACK\t"  + "\t/query/" + queryName + "/axis/"+axisName+"/limit/\tDELETE");
+		}
+		olapQueryService.clearLimit(queryName, axisName);
+	}
+
+	@POST
+	@Produces({"application/json" })
+	@Path("/{queryname}/axis/{axis}/filter")
+	public void filterAxis(
+			@PathParam("queryname") String queryName, 
+			@PathParam("axis") String axisName,
+			@FormParam("filterCondition") String filterCondition)
+	{
+		if (log.isDebugEnabled()) {
+			log.debug("TRACK\t"  + "\t/query/" + queryName + "/axis/"+axisName+"/filter/ (" + filterCondition +" )\tPOST");
+		}
+		olapQueryService.filterAxis(queryName, axisName, filterCondition);
+	}
+	
+	@DELETE
+	@Produces({"application/json" })
+	@Path("/{queryname}/axis/{axis}/filter")
+	public void ckearFilter(
+			@PathParam("queryname") String queryName, 
+			@PathParam("axis") String axisName)
+	{
+		if (log.isDebugEnabled()) {
+			log.debug("TRACK\t"  + "\t/query/" + queryName + "/axis/"+axisName+"/filter/\tDELETE");
+		}
+		olapQueryService.clearFilter(queryName, axisName);
 	}
 
 }
