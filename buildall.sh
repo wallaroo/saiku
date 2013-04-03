@@ -1,4 +1,5 @@
 #!/bin/bash
+git merge master
 curl https://raw.github.com/pentaho/mondrian/lagunitas/demo/FoodMart.mondrian.xml > util/FoodMart.xml
 cp util/FoodMart.xml saiku-core/saiku-service/src/test/resources/org/saiku/olap/discover/FoodMart.xml
 cd saiku-core
