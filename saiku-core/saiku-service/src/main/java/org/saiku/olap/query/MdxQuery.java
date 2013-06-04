@@ -19,7 +19,8 @@ package org.saiku.olap.query;
 import java.util.Map;
 import java.util.Properties;
 
-import org.apache.commons.lang.exception.ExceptionUtils;
+import mondrian.rolap.RolapConnection;
+
 import org.olap4j.Axis;
 import org.olap4j.CellSet;
 import org.olap4j.OlapConnection;
@@ -40,7 +41,6 @@ import org.olap4j.type.CubeType;
 import org.saiku.olap.dto.SaikuCube;
 import org.saiku.olap.dto.SaikuTag;
 import org.saiku.olap.util.exception.SaikuOlapException;
-import org.saiku.service.olap.OlapQueryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -100,13 +100,19 @@ public class MdxQuery implements IQuery {
 	}
     
     public void setProperties(Properties props) {
-    	this.properties = props;
+    	this.properties.putAll(props);
     }
     
     public Properties getProperties() {
     	Properties props = new Properties(this.properties);
-		props.put(QueryProperties.KEY_IS_DRILLTHROUGH, "true");
-		return props;
+    	props.put(QueryProperties.KEY_IS_DRILLTHROUGH, isDrillThroughEnabled().toString());
+    	props.put("org.saiku.connection.scenario", Boolean.toString(false));
+    	try {
+    		props.put("org.saiku.query.explain", Boolean.toString(connection.isWrapperFor(RolapConnection.class)));
+    	} catch (Exception e) {
+    		props.put("org.saiku.query.explain", Boolean.toString(false));
+    	}
+    	return props;
     }
     
     public String toXml() {
@@ -115,7 +121,13 @@ public class MdxQuery implements IQuery {
     }
     
     public Boolean isDrillThroughEnabled() {
-    	return true;
+    	try {
+    		Cube cube = getCube();
+    		return (cube != null && cube.isDrillThroughEnabled());
+    	} catch (Exception e) {
+    		e.printStackTrace();
+    	};
+    	return false;
     }
 
 	public CellSet execute() throws Exception {
@@ -217,6 +229,10 @@ public class MdxQuery implements IQuery {
 	}
 
 	public void clearAllQuerySelections() {
+		throw new UnsupportedOperationException();
+	}
+	
+	public void clearAxis(String axisName) throws SaikuOlapException {
 		throw new UnsupportedOperationException();
 	}
 

@@ -17,6 +17,7 @@ package org.saiku.olap.query;
 
 import java.io.StringWriter;
 import java.util.List;
+import java.util.Properties;
 
 import javax.xml.parsers.ParserConfigurationException;
 
@@ -105,6 +106,8 @@ public class QuerySerializer {
         }
         rootEle = appendMdxQuery(rootEle);
         
+        rootEle = appendProperties(rootEle);
+        
         dom.setRootElement(rootEle);
 
     }
@@ -129,6 +132,23 @@ public class QuerySerializer {
         rootElement.addContent(mdx);
         
         return rootElement;
+    }
+    
+    private Element appendProperties(Element rootElement) {
+    	Element props = new Element("Properties");
+    	Properties p = this.query.getProperties();
+    	if (p != null && !p.isEmpty()) {
+    		for (Object key : p.keySet()) {
+    			Element pe = new Element("Property");
+    			String k = key.toString();
+    			String v = p.getProperty(k);
+    			pe.setAttribute("name", k);
+    			pe.setAttribute("value", v);
+    			props.addContent(pe);
+    		}
+    	}
+    	rootElement.addContent(props);
+    	return rootElement;
     }
     
     private Element appendAxes(Element rootElement) {

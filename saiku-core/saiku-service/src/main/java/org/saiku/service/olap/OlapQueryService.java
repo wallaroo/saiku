@@ -60,8 +60,8 @@ import org.olap4j.query.Query;
 import org.olap4j.query.QueryAxis;
 import org.olap4j.query.QueryDimension;
 import org.olap4j.query.Selection;
+import org.olap4j.query.Selection.Operator;
 import org.olap4j.query.SortOrder;
-import org.olap4j.type.LevelType;
 import org.saiku.olap.dto.SaikuCube;
 import org.saiku.olap.dto.SaikuDimensionSelection;
 import org.saiku.olap.dto.SaikuMember;
@@ -131,9 +131,10 @@ public class OlapQueryService implements Serializable {
 
 	public SaikuQuery createNewOlapQuery(String name, String xml) {
 		try {
-			SaikuCube scube = QueryDeserializer.getFakeCube(xml);
+			QueryDeserializer qd = new QueryDeserializer();
+			SaikuCube scube = qd.getFakeCube(xml);
 			OlapConnection con = olapDiscoverService.getNativeConnection(scube.getConnectionName());
-			IQuery query = QueryDeserializer.unparse(xml, con);
+			IQuery query = qd.unparse(xml, con);
 			if (name == null) {
 				putIQuery(query.getName(), query);
 			}
@@ -198,7 +199,7 @@ public class OlapQueryService implements Serializable {
 		else if (formatter.equals("flattened")) {
 			return execute(queryName, new FlattenedCellSetFormatter());
 		}
-		return execute(queryName, new HierarchicalCellSetFormatter());
+		return execute(queryName, new FlattenedCellSetFormatter());
 	}
 
 	public CellDataSet execute(String queryName, ICellSetFormatter formatter) {
@@ -249,7 +250,8 @@ public class OlapQueryService implements Serializable {
 	
 	private IQuery applyTag(IQuery query, OlapConnection con, SaikuTag t) throws Exception {
 		String xml = query.toXml();
-		query = QueryDeserializer.unparse(xml, con);
+		QueryDeserializer qd = new QueryDeserializer();
+		query = qd.unparse(xml, con);
 		
 		List<SaikuTupleDimension> doneDimension = new ArrayList<SaikuTupleDimension>();
 		Map<String,QueryDimension> dimensionMap = new HashMap<String,QueryDimension>();
@@ -529,16 +531,71 @@ public class OlapQueryService implements Serializable {
 
 	}
 
-	public void swapAxes(String queryName) {
-		getIQuery(queryName).swapAxes();
+	public IQuery swapAxes(String queryName) {
+		IQuery query = getIQuery(queryName);
+		if (QueryType.QM.equals(query.getType())) {
+			query.swapAxes();
+		}		
+		return query;
 	}
+	
+	public boolean includeChildren(String queryName, String dimensionName, String uniqueMemberName) {
+		IQuery query = getIQuery(queryName);
+		List<IdentifierSegment> memberList = IdentifierNode.parseIdentifier(uniqueMemberName).getSegmentList();
+		QueryDimension dimension = query.getDimension(dimensionName);
+		try {
+			Selection sel = dimension.createSelection(Operator.CHILDREN, memberList);
+			dimension.getInclusions().add(sel);
+			return true;
+		} catch (OlapException e) {
+			throw new SaikuServiceException("Cannot include children query ("+queryName+") dimension (" + dimensionName + ") member ("+
+					uniqueMemberName +")" ,e);
+		}
+	}
+	
+	public boolean removeChildren(String queryName, String dimensionName, String uniqueMemberName) {
+		IQuery query = getIQuery(queryName);
+		List<IdentifierSegment> memberList = IdentifierNode.parseIdentifier(uniqueMemberName).getSegmentList();
+		QueryDimension dimension = query.getDimension(dimensionName);
+		try {
+			Selection sel = dimension.createSelection(Operator.CHILDREN, memberList);
+			if (dimension.getInclusions().contains(sel)) {
+				dimension.getInclusions().remove(sel);
+			}
+			return true;
+		} catch (OlapException e) {
+			throw new SaikuServiceException("Cannot remove children query ("+queryName+") dimension (" + dimensionName + ") member ("+
+					uniqueMemberName +")" ,e);
+		}
+	}
+	
+	public boolean removeAllChildren(String queryName, String dimensionName) {
+		IQuery query = getIQuery(queryName);
+		QueryDimension dimension = query.getDimension(dimensionName);
+		List<Selection> children = new ArrayList<Selection>();
+		try {
+			for (Selection sel : dimension.getInclusions()) {
+				if (sel.getOperator().equals(Operator.CHILDREN)) {
+					children.add(sel);
+				}
+			}
+			dimension.getInclusions().removeAll(children);
+			return true;
+		} catch (Exception e) {
+			throw new SaikuServiceException("Cannot remove all children  for query ("+queryName+") dimension (" + dimensionName + ")",e);
+		}
+	}
+
 
 	public boolean includeMember(String queryName, String dimensionName, String uniqueMemberName, String selectionType, int memberposition){
 		IQuery query = getIQuery(queryName);
+
+		
 		List<IdentifierSegment> memberList = IdentifierNode.parseIdentifier(uniqueMemberName).getSegmentList();
 		QueryDimension dimension = query.getDimension(dimensionName);
 		final Selection.Operator selectionMode = Selection.Operator.valueOf(selectionType);
 		try {
+			removeAllChildren(queryName, dimensionName);
 			Selection sel = dimension.createSelection(selectionMode, memberList);
 			if (dimension.getInclusions().contains(sel)) {
 				dimension.getInclusions().remove(sel);
@@ -556,6 +613,7 @@ public class OlapQueryService implements Serializable {
 
 	public boolean removeMember(String queryName, String dimensionName, String uniqueMemberName, String selectionType) throws SaikuServiceException{
 		IQuery query = getIQuery(queryName);
+		removeAllChildren(queryName, dimensionName);
 		List<IdentifierSegment> memberList = IdentifierNode.parseIdentifier(uniqueMemberName).getSegmentList();
 		QueryDimension dimension = query.getDimension(dimensionName);
 		final Selection.Operator selectionMode = Selection.Operator.valueOf(selectionType);
@@ -573,6 +631,7 @@ public class OlapQueryService implements Serializable {
 
 	public boolean includeLevel(String queryName, String dimensionName, String uniqueHierarchyName, String uniqueLevelName) {
 		IQuery query = getIQuery(queryName);
+		removeAllChildren(queryName, dimensionName);
 		QueryDimension dimension = query.getDimension(dimensionName);
 		for (Hierarchy hierarchy : dimension.getDimension().getHierarchies()) {
 			if (hierarchy.getUniqueName().equals(uniqueHierarchyName)) {
@@ -592,6 +651,7 @@ public class OlapQueryService implements Serializable {
 
 	public boolean removeLevel(String queryName, String dimensionName, String uniqueHierarchyName, String uniqueLevelName) {
 		IQuery query = getIQuery(queryName);
+		removeAllChildren(queryName, dimensionName);
 		QueryDimension dimension = query.getDimension(dimensionName);
 		try {
 			for (Hierarchy hierarchy : dimension.getDimension().getHierarchies()) {		
@@ -693,14 +753,13 @@ public class OlapQueryService implements Serializable {
 		query.clearAllQuerySelections();
 	}
 
-	public void clearAxis(String queryName, String axisName) {
-		IQuery query = getIQuery(queryName);
-		if (Axis.Standard.valueOf(axisName) != null) {
-			QueryAxis qAxis = query.getAxis(Axis.Standard.valueOf(axisName));
-			query.resetAxisSelections(qAxis);
-			for (QueryDimension dim : qAxis.getDimensions()) {
-				qAxis.removeDimension(dim);
-			}
+	public IQuery clearAxis(String queryName, String axisName) {
+		try {
+			IQuery query = getIQuery(queryName);
+			query.clearAxis(axisName);
+			return query;
+		} catch (SaikuOlapException e) {
+			throw new SaikuServiceException("Cannot clear for query: " + queryName + " axis: " + axisName,e);
 		}
 	}
 
@@ -784,23 +843,7 @@ public class OlapQueryService implements Serializable {
 
 	public Properties getProperties(String queryName) {
 		IQuery query = getIQuery(queryName);
-		OlapConnection con = olapDiscoverService.getNativeConnection(query.getSaikuCube().getConnectionName());
 		Properties props = query.getProperties();
-		try {
-			con.createScenario();
-			if (query.getDimension("Scenario") != null) {
-				props.put("org.saiku.connection.scenario", Boolean.toString(true));
-			}
-			else {
-				props.put("org.saiku.connection.scenario", Boolean.toString(false));
-			}
-			props.put("org.saiku.query.explain", Boolean.toString(con.isWrapperFor(RolapConnection.class)));
-
-			
-		} catch (Exception e) {
-			props.put("org.saiku.connection.scenario", Boolean.toString(false));
-			props.put("org.saiku.query.explain", Boolean.toString(false));
-		}
 		return props;
 	}
 
@@ -814,7 +857,7 @@ public class OlapQueryService implements Serializable {
 	}
 
 	public byte[] getExport(String queryName, String type) {
-		return getExport(queryName,type,new HierarchicalCellSetFormatter());
+		return getExport(queryName,type,new FlattenedCellSetFormatter());
 	}
 
 	public byte[] getExport(String queryName, String type, String formatter) {
@@ -827,7 +870,7 @@ public class OlapQueryService implements Serializable {
 			return getExport(queryName, type, new HierarchicalCellSetFormatter());
 		}
 
-		return getExport(queryName, type, new HierarchicalCellSetFormatter());
+		return getExport(queryName, type, new FlattenedCellSetFormatter());
 	}
 
 	public byte[] getExport(String queryName, String type, ICellSetFormatter formatter) {
@@ -921,5 +964,4 @@ public class OlapQueryService implements Serializable {
 	private Map<String, IQuery> getIQueryMap() {
 		return queries;
 	}
-
 }

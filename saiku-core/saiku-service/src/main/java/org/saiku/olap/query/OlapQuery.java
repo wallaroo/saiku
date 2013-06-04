@@ -18,9 +18,13 @@ package org.saiku.olap.query;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
+import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Properties;
 
+import mondrian.rolap.RolapConnection;
+
+import org.apache.commons.lang.StringUtils;
 import org.olap4j.Axis;
 import org.olap4j.Axis.Standard;
 import org.olap4j.CellSet;
@@ -31,11 +35,13 @@ import org.olap4j.impl.IdentifierParser;
 import org.olap4j.mdx.ParseTreeWriter;
 import org.olap4j.metadata.Catalog;
 import org.olap4j.metadata.Cube;
+import org.olap4j.query.LimitFunction;
 import org.olap4j.query.Query;
 import org.olap4j.query.QueryAxis;
 import org.olap4j.query.QueryDimension;
 import org.olap4j.query.QueryDimension.HierarchizeMode;
 import org.olap4j.query.Selection;
+import org.olap4j.query.SortOrder;
 import org.saiku.olap.dto.SaikuCube;
 import org.saiku.olap.dto.SaikuTag;
 import org.saiku.olap.query.QueryProperties.QueryProperty;
@@ -81,6 +87,50 @@ public class OlapQuery implements IQuery {
 	
 	public void swapAxes() {
 		this.query.swapAxes();
+
+
+		QueryAxis rows = query.getAxis(Axis.ROWS);
+		QueryAxis cols = query.getAxis(Axis.COLUMNS);
+		
+		// 3-way swap
+		String colFilter = cols.getFilterCondition();
+		LimitFunction colLimit = cols.getLimitFunction();
+		BigDecimal colN = cols.getLimitFunctionN();
+		String colLimitSort = cols.getLimitFunctionSortLiteral();
+		SortOrder colSort = cols.getSortOrder();
+		String colSortIdentifier = cols.getSortIdentifierNodeName();
+
+		cols.clearFilter();
+		cols.clearLimitFunction();
+		cols.clearSort();
+		
+		// columns
+		if (rows.getSortOrder() != null) {
+			cols.sort(rows.getSortOrder(), rows.getSortIdentifierNodeName());
+		}
+		if (rows.getLimitFunction() != null) {
+			cols.limit(rows.getLimitFunction(), rows.getLimitFunctionN(), rows.getLimitFunctionSortLiteral());
+		}
+		if (StringUtils.isNotBlank(rows.getFilterCondition())) {
+			cols.filter(rows.getFilterCondition());
+		}
+		
+		rows.clearFilter();
+		rows.clearLimitFunction();
+		rows.clearSort();
+		
+		// rows
+		if (colSort != null) {
+			rows.sort(colSort, colSortIdentifier);
+		}
+		if (colLimit != null) {
+			rows.limit(colLimit, colN, colLimitSort);
+		}
+		if (StringUtils.isNotBlank(colFilter)) {
+			rows.filter(colFilter);
+		}
+		
+
 	}
 	
 	public Map<Axis, QueryAxis> getAxes() {
@@ -116,14 +166,18 @@ public class OlapQuery implements IQuery {
 	}
 
 	public void moveDimension(QueryDimension dimension, Axis axis, int position) {
-		dimension.setHierarchizeMode(HierarchizeMode.PRE);
         QueryAxis oldQueryAxis = findAxis(dimension);
         QueryAxis newQueryAxis = query.getAxis(axis);
-		if (dimension.getName() != "Measures") {
+		if (dimension.getName() != "Measures" && !Axis.FILTER.equals(axis)) {
 			dimension.setHierarchyConsistent(true);
+			dimension.setHierarchizeMode(HierarchizeMode.PRE);
+		} else {
+			dimension.setHierarchyConsistent(false);
+			dimension.clearHierarchizeMode();
 		}
 		
-		if (oldQueryAxis != null && newQueryAxis != null && (oldQueryAxis.getLocation() != newQueryAxis.getLocation()) && oldQueryAxis.getLocation() != null) {
+		if (oldQueryAxis != null && newQueryAxis != null && (oldQueryAxis.getLocation() != newQueryAxis.getLocation()) && oldQueryAxis.getLocation() != null) 
+		{
 			for (QueryAxis qAxis : query.getAxes().values()) {
 				if (qAxis.getSortOrder() != null && qAxis.getSortIdentifierNodeName() != null) {
 					String sortLiteral = qAxis.getSortIdentifierNodeName();
@@ -178,7 +232,7 @@ public class OlapQuery implements IQuery {
     public String getName() {
     	return query.getName();
     }
-    
+
     public CellSet execute() throws Exception {
 
     	if (scenario != null && query.getDimension(SCENARIO) != null) {
@@ -225,6 +279,12 @@ public class OlapQuery implements IQuery {
 			dim.clearExclusions();
 			dim.clearSort();
 		}
+		try {
+			axis.clearFilter();
+			axis.clearLimitFunction();
+			axis.clearSort();
+		} catch (NoSuchMethodError e) {}
+			
 	}
 
 	public void clearAllQuerySelections() {
@@ -236,29 +296,56 @@ public class OlapQuery implements IQuery {
 	}
 	
 	public void resetQuery() {
-		resetAxisSelections(getUnusedAxis());
+		clearAllQuerySelections();
 		Map<Axis,QueryAxis> axes = getAxes();
 		for (Axis axis : axes.keySet()) {
-			resetAxisSelections(axes.get(axis));
-			if (axis != null) {
-				for (QueryDimension dim : getAxis(axis).getDimensions())
-				moveDimension(dim, getUnusedAxis().getLocation());
+			QueryAxis qAxis = axes.get(axis);
+			for (int i = 0; i < qAxis.getDimensions().size(); i++ ) {
+				QueryDimension qDim = qAxis.getDimensions().get(0);
+				moveDimension(qDim, null);
+			}
+		}
+	}
+	
+	public void clearAxis(String axisName) throws SaikuOlapException {
+		if (StringUtils.isNotBlank(axisName)) {
+			QueryAxis qAxis = getAxis(axisName);
+			resetAxisSelections(qAxis);
+			for (int i = 0; i < qAxis.getDimensions().size(); i++ ) {
+				QueryDimension qDim = qAxis.getDimensions().get(0);
+				moveDimension(qDim, null);
 			}
 		}
 	}
     
-    public void setProperties(Properties props) {
-    	this.properties = props;
-    	for (Object _key : props.keySet()) {
-    		String key = (String) _key;
-    		String value = props.getProperty((String) key);
-    		QueryProperty prop = QueryPropertyFactory.getProperty(key, value, this);
-    		prop.handle();
-    	}
-    }
+	public void setProperties(Properties props) {
+		if (props != null) {
+			this.properties.putAll(props);
+			for (Object _key : props.keySet()) {
+				String key = (String) _key;
+				String value = props.getProperty((String) key);
+				QueryProperty prop = QueryPropertyFactory.getProperty(key, value, this);
+				prop.handle();
+			}
+		}
+	}
     
     public Properties getProperties() {
     	this.properties.putAll(QueryPropertyFactory.forQuery(this));
+		try {
+			
+			connection.createScenario();
+			if (query.getDimension("Scenario") != null) {
+				this.properties.put("org.saiku.connection.scenario", Boolean.toString(true));
+			}
+			else {
+				this.properties.put("org.saiku.connection.scenario", Boolean.toString(false));
+			}
+			this.properties.put("org.saiku.query.explain", Boolean.toString(connection.isWrapperFor(RolapConnection.class)));
+		} catch (Exception e) {
+			this.properties.put("org.saiku.connection.scenario", Boolean.toString(false));
+			this.properties.put("org.saiku.query.explain", Boolean.toString(false));
+		}
     	return this.properties;
     }
     

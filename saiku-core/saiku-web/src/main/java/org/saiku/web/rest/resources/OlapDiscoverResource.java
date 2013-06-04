@@ -16,7 +16,7 @@
 package org.saiku.web.rest.resources;
 
 import java.io.Serializable;
-import java.sql.SQLException;
+import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -27,12 +27,12 @@ import javax.ws.rs.Produces;
 
 import org.saiku.olap.dto.SaikuConnection;
 import org.saiku.olap.dto.SaikuCube;
+import org.saiku.olap.dto.SaikuCubeMetadata;
 import org.saiku.olap.dto.SaikuDimension;
 import org.saiku.olap.dto.SaikuHierarchy;
 import org.saiku.olap.dto.SaikuLevel;
 import org.saiku.olap.dto.SaikuMember;
 import org.saiku.service.olap.OlapDiscoverService;
-import org.saiku.service.util.exception.SaikuServiceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -111,6 +111,30 @@ public class OlapDiscoverResource implements Serializable {
 		}
     }
     
+    
+	@GET
+    @Produces({"application/json" })
+	@Path("/{connection}/{catalog}/{schema}/{cube}/metadata")
+     public SaikuCubeMetadata getMetadata(
+    		 @PathParam("connection") String connectionName, 
+    		 @PathParam("catalog") String catalogName, 
+    		 @PathParam("schema") String schemaName, 
+    		 @PathParam("cube") String cubeName) 
+    {
+		if ("null".equals(schemaName)) {
+			schemaName = "";
+		}
+		SaikuCube cube = new SaikuCube(connectionName, cubeName,cubeName,cubeName, catalogName, schemaName);
+		try {
+			List<SaikuDimension> dimensions = olapDiscoverService.getAllDimensions(cube);
+			List<SaikuMember> measures = olapDiscoverService.getMeasures(cube);
+			return new SaikuCubeMetadata(dimensions, measures);
+		} catch (Exception e) {
+			log.error(this.getClass().getName(),e);
+		}
+		return new SaikuCubeMetadata(null, null);
+	}
+	
 	@GET
     @Produces({"application/json" })
 	@Path("/{connection}/{catalog}/{schema}/{cube}/dimensions")
@@ -147,7 +171,7 @@ public class OlapDiscoverResource implements Serializable {
 		}
 		SaikuCube cube = new SaikuCube(connectionName, cubeName,cubeName,cubeName, catalogName, schemaName);
 		try {
-			return olapDiscoverService.getDimension(cube, dimensionName);
+			return olapDiscoverService.getDimension(cube, URLDecoder.decode(dimensionName, "UTF-8"));
 		} catch (Exception e) {
 			log.error(this.getClass().getName(),e);
 		}
@@ -167,7 +191,7 @@ public class OlapDiscoverResource implements Serializable {
 		}
 		SaikuCube cube = new SaikuCube(connectionName, cubeName,cubeName,cubeName, catalogName, schemaName);
 		try {
-			return olapDiscoverService.getAllDimensionHierarchies(cube, dimensionName);
+			return olapDiscoverService.getAllDimensionHierarchies(cube, URLDecoder.decode(dimensionName, "UTF-8"));
 		} catch (Exception e) {
 			log.error(this.getClass().getName(),e);
 		}
@@ -189,7 +213,7 @@ public class OlapDiscoverResource implements Serializable {
 		}
 		SaikuCube cube = new SaikuCube(connectionName, cubeName,cubeName,cubeName, catalogName, schemaName);
 		try {
-			return olapDiscoverService.getAllHierarchyLevels(cube, dimensionName, hierarchyName);
+			return olapDiscoverService.getAllHierarchyLevels(cube, URLDecoder.decode(dimensionName, "UTF-8"), URLDecoder.decode(hierarchyName, "UTF-8"));
 		} catch (Exception e) {
 			log.error(this.getClass().getName(),e);
 		}
@@ -215,9 +239,11 @@ public class OlapDiscoverResource implements Serializable {
 		if ("null".equals(schemaName)) {
 			schemaName = "";
 		}
+
 		SaikuCube cube = new SaikuCube(connectionName, cubeName,cubeName,cubeName, catalogName, schemaName);
+
 		try {
-			return olapDiscoverService.getLevelMembers(cube, dimensionName, hierarchyName, levelName);
+			return olapDiscoverService.getLevelMembers(cube, URLDecoder.decode(dimensionName, "UTF-8"), URLDecoder.decode(hierarchyName, "UTF-8"), URLDecoder.decode(levelName, "UTF-8"));
 		} catch (Exception e) {
 			log.error(this.getClass().getName(),e);
 		}
@@ -243,7 +269,7 @@ public class OlapDiscoverResource implements Serializable {
 		}
 		SaikuCube cube = new SaikuCube(connectionName, cubeName,cubeName,cubeName, catalogName, schemaName);
 		try {
-			return olapDiscoverService.getHierarchyRootMembers(cube, hierarchyName);
+			return olapDiscoverService.getHierarchyRootMembers(cube, URLDecoder.decode(hierarchyName, "UTF-8"));
 		} catch (Exception e) {
 			log.error(this.getClass().getName(),e);
 		}
@@ -308,7 +334,7 @@ public class OlapDiscoverResource implements Serializable {
 		}
 		SaikuCube cube = new SaikuCube(connectionName, cubeName,cubeName,cubeName, catalogName, schemaName);
 		try {
-			return olapDiscoverService.getMember(cube, memberName);
+			return olapDiscoverService.getMember(cube, URLDecoder.decode(memberName, "UTF-8"));
 		} catch (Exception e) {
 			log.error(this.getClass().getName(),e);
 		}
@@ -334,7 +360,7 @@ public class OlapDiscoverResource implements Serializable {
 		}
 		SaikuCube cube = new SaikuCube(connectionName, cubeName,cubeName,cubeName, catalogName, schemaName);
 		try {
-			return olapDiscoverService.getMemberChildren(cube, memberName);
+			return olapDiscoverService.getMemberChildren(cube, URLDecoder.decode(memberName, "UTF-8"));
 		} catch (Exception e) {
 			log.error(this.getClass().getName(),e);
 		}
