@@ -18,16 +18,22 @@ package org.saiku.web.rest.resources;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
 
+import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.GET;
@@ -41,10 +47,14 @@ import javax.ws.rs.core.Response.Status;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.commons.vfs.FileObject;
 import org.apache.commons.vfs.FileSystemManager;
 import org.apache.commons.vfs.FileType;
+import org.apache.commons.vfs.FileUtil;
 import org.apache.commons.vfs.VFS;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.saiku.service.util.exception.SaikuServiceException;
@@ -58,6 +68,9 @@ import org.saiku.web.service.SessionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+
+import com.sun.jersey.core.header.FormDataContentDisposition;
+import com.sun.jersey.multipart.FormDataParam;
 
 /**
  * QueryServlet contains all the methods required when manipulating an OLAP Query.
@@ -363,6 +376,131 @@ public class BasicRepositoryResource2 implements ISaikuRepository {
 			log.error("Cannot move resource from " + source + " to " + target ,e);
 			return Response.serverError().entity("Cannot move resource from " + source + " to " + target + " ( " + e.getMessage() + ")").type("text/plain").build();
 		}
+		
+	}
+	
+	@GET
+	@Path("/zip")
+	public Response getResourcesAsZip (
+			@QueryParam("directory") String directory,
+			@QueryParam("files") String files) 
+	{
+		try {
+			if (StringUtils.isBlank(directory))
+				return Response.ok().build();
+
+			ByteArrayOutputStream bos = new ByteArrayOutputStream();
+			ZipOutputStream zos = new ZipOutputStream(bos);
+
+			String[] fileArray = null;
+			if (StringUtils.isBlank(files)) {
+				FileObject dir = repo.resolveFile(directory);
+				for (FileObject fo : dir.getChildren()) {
+					if (fo.getType().equals(FileType.FILE)) {
+						String entry = fo.getName().getBaseName();
+						if ("saiku".equals(fo.getName().getExtension())) {
+							byte[] doc = FileUtil.getContent(fo);
+							ZipEntry ze = new ZipEntry(entry);
+							zos.putNextEntry(ze);
+							zos.write(doc);
+						}
+					}
+				}
+			} else {
+				fileArray = files.split(",");
+				for (String f : fileArray) {
+					String resource = directory + "/" + f;
+					Response r = getResource(resource);
+					if (Status.OK.equals(Status.fromStatusCode(r.getStatus()))) {
+						byte[] doc = (byte[]) r.getEntity();
+						ZipEntry ze = new ZipEntry(f);
+						zos.putNextEntry(ze);
+						zos.write(doc);
+					}
+				}
+			}
+			zos.closeEntry();
+			zos.close();
+			byte[] zipDoc = bos.toByteArray();
+			
+			return Response.ok(zipDoc, MediaType.APPLICATION_OCTET_STREAM).header(
+					"content-disposition",
+					"attachment; filename = " + directory + ".zip").header(
+							"content-length",zipDoc.length).build();
+			
+			
+		} catch(Exception e){
+			log.error("Cannot zip resources " + files ,e);
+			String error = ExceptionUtils.getRootCauseMessage(e);
+			return Response.serverError().entity(error).build();
+		}
+
+	}
+	
+	@POST
+	@Path("/zipupload")
+	@Consumes(MediaType.MULTIPART_FORM_DATA)
+	public Response uploadArchiveZip(
+			@QueryParam("test") String test,
+			@FormDataParam("file") InputStream uploadedInputStream,
+			@FormDataParam("file") FormDataContentDisposition fileDetail, 
+			@FormDataParam("directory") String directory) 
+	{
+		String zipFile = fileDetail.getFileName();
+		String output = "";
+		try {
+			if (StringUtils.isBlank(zipFile))
+				throw new Exception("You must specify a zip file to upload");
+			
+			output = "Uploding file: " + zipFile + " ...\r\n";
+			ZipInputStream zis = new ZipInputStream(uploadedInputStream);
+		    ZipEntry ze = zis.getNextEntry();
+		    byte[] doc = null;
+		    boolean isFile = false;
+		    if (ze == null) {
+		    	doc = IOUtils.toByteArray(uploadedInputStream);
+		    	isFile = true;
+		    }
+			while (ze != null || doc != null) {
+					String fileName = null; 
+				   if (!isFile) {
+					   fileName = ze.getName();
+					   doc = IOUtils.toByteArray(zis);
+				   } else {
+					   fileName = zipFile;
+				   }
+		    	   
+		    	   output += "Saving " + fileName + "... ";
+		    	   String fullPath = (StringUtils.isNotBlank(directory)) ? directory + "/" + fileName : fileName;		    	   
+		    	   
+		    	   String content = new String(doc);
+		    	   Response r = saveResource(fullPath, content);
+		    	   doc = null;
+		    	   
+		    	   if (Status.OK.getStatusCode() != r.getStatus()) {
+		    		   output += " ERROR: " + r.getEntity().toString() + "\r\n";
+		    	   } else {
+		    		   output += " OK\r\n";
+		    	   }
+		    	   if (!isFile)
+		    		   ze = zis.getNextEntry();
+		    	}
+
+				if (!isFile) {
+					zis.closeEntry();
+					zis.close();
+				}
+				uploadedInputStream.close();
+	    		
+		    	output += " SUCCESSFUL!\r\n";
+		    	return Response.ok(output).build();
+		    	
+		} catch(Exception e){
+			log.error("Cannot unzip resources " + zipFile ,e);
+			String error = ExceptionUtils.getRootCauseMessage(e);
+			return Response.serverError().entity(output + "\r\n" + error).build();
+		}	
+		
 		
 	}
 	

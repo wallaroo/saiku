@@ -13,7 +13,7 @@ git submodule update
 cd saiku-ui
 git checkout master 
 git pull
-mvn -U clean package install:install-file -Dfile=target/saiku-ui-2.5-SNAPSHOT.war  -DgroupId=org.saiku -DartifactId=saiku-ui -Dversion=MONDRIAN4-SNAPSHOT -Dpackaging=war
+mvn -U clean package install:install-file -Dfile=target/saiku-ui-2.6-SNAPSHOT.war  -DgroupId=org.saiku -DartifactId=saiku-ui -Dversion=MONDRIAN4-SNAPSHOT -Dpackaging=war
 cd ../saiku-server
 mvn -U clean package
 cd ../saiku-bi-platform-plugin-util
