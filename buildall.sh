@@ -21,3 +21,5 @@ cd ../saiku-bi-platform-plugin-util
 mvn -U clean install
 cd ../saiku-bi-platform-plugin
 mvn -U clean package
+cd ../saiku-bi-platform-plugin-p5
+mvn clean package
