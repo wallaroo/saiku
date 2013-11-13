@@ -3,6 +3,7 @@ package org.saiku.web.rest.resources;
 import java.util.List;
 
 import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -22,7 +23,9 @@ public interface ISaikuRepository {
 	@GET
 	@Produces({ "application/json" })
 	public List<IRepositoryObject> getRepository(
-			@QueryParam("path") String path, @QueryParam("type") String type);
+			@QueryParam("path") String path,
+			@QueryParam("type") String type,
+			@DefaultValue("false") @QueryParam("all") boolean all);
 
 	/**
 	 * Load a resource.

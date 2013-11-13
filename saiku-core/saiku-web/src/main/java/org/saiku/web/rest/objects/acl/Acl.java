@@ -32,10 +32,10 @@ import org.slf4j.LoggerFactory;
  * 
  */
 public class Acl {
-
+	public static final String SAIKUACCESS_FILE = ".saikuaccess";
 	private Map<String, AclEntry> acl = new TreeMap<String, AclEntry>();
 	private static final Logger logger = LoggerFactory.getLogger(Acl.class);
-	private static final String SAIKUACCESS_FILE = ".saikuaccess";
+	
 
 	private List<String> adminRoles;
 	private AclMethod rootMethod = AclMethod.WRITE;
