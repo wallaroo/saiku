@@ -35,12 +35,14 @@ import java.util.zip.ZipOutputStream;
 
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
@@ -129,11 +131,12 @@ public class BasicRepositoryResource2 implements ISaikuRepository {
 	@Produces({"application/json" })
 	public List<IRepositoryObject> getRepository (
 			@QueryParam("path") String path,
-			@QueryParam("type") String type) 
+			@QueryParam("type") String type,
+			@DefaultValue("false") @QueryParam("all") boolean all) 
 	{
 		List<IRepositoryObject> objects = new ArrayList<IRepositoryObject>();
 		try {
-			if (path != null && (path.startsWith("/") || path.startsWith("."))) {
+			if (path != null && (path.startsWith("/") || path.equals(Acl.SAIKUACCESS_FILE))) {
 				throw new IllegalArgumentException("Path cannot be null or start with \"/\" or \".\" - Illegal Path: " + path);
 			}
 
@@ -152,7 +155,7 @@ public class BasicRepositoryResource2 implements ISaikuRepository {
 				if ( !acl.canRead(path,username, roles) ) {
 					return new ArrayList<IRepositoryObject>(); // empty  
 				} else {
-					return getRepositoryObjects(folder, type);
+					return getRepositoryObjects(folder, type, all);
 				}
 			}
 			else {
@@ -169,8 +172,8 @@ public class BasicRepositoryResource2 implements ISaikuRepository {
 	@Path("/resource/acl")
 	public AclEntry getResourceAcl(@QueryParam("file") String file) {
 		try {
-			if (file == null || file.startsWith("/") || file.startsWith(".")) {
-				throw new IllegalArgumentException("Path cannot be null or start with \"/\" or \".\" - Illegal Path: " + file);
+			if (file == null || file.startsWith("/") || file.equals(Acl.SAIKUACCESS_FILE)) {
+				throw new IllegalArgumentException("Path cannot be null or start with \"/\" - Illegal Path: " + file);
 			}
 			String username = sessionService.getAllSessionObjects().get("username").toString();
 			List<String> roles = (List<String> ) sessionService.getAllSessionObjects().get("roles");
@@ -180,7 +183,7 @@ public class BasicRepositoryResource2 implements ISaikuRepository {
 		} catch (Exception e) {
 			log.error("Error retrieving ACL for file: " + file, e);
 		}
-		throw new SaikuServiceException("You dont have permission to retrieve ACL for file: " + file);
+		throw new WebApplicationException(new SaikuServiceException("You dont have permission to retrieve ACL for file: " + file),403);
 	}
 	
 	
@@ -189,8 +192,8 @@ public class BasicRepositoryResource2 implements ISaikuRepository {
 	@Path("/resource/acl")
 	public Response setResourceAcl(@FormParam("file") String file, @FormParam("acl") String aclEntry) {
 		try {
-			if (file == null || file.startsWith("/") || file.startsWith(".")) {
-				throw new IllegalArgumentException("Path cannot be null or start with \"/\" or \".\" - Illegal Path: " + file);
+			if (file == null || file.startsWith("/") || file.equals(Acl.SAIKUACCESS_FILE)) {
+				throw new IllegalArgumentException("Path cannot be null or start with \"/\" - Illegal Path: " + file);
 			}
 			ObjectMapper mapper = new ObjectMapper();
 			log.debug("Set ACL to " + file + " : " + aclEntry);
@@ -219,8 +222,8 @@ public class BasicRepositoryResource2 implements ISaikuRepository {
 	public Response getResource (@QueryParam("file") String file)
 	{
 		try {
-			if (file == null || file.startsWith("/") || file.startsWith(".")) {
-				throw new IllegalArgumentException("Path cannot be null or start with \"/\" or \".\" - Illegal Path: " + file);
+			if (file == null || file.startsWith("/") || file.equals(Acl.SAIKUACCESS_FILE)) {
+				throw new IllegalArgumentException("Path cannot be null or start with \"/\" or \".saikuaccess\" - Illegal Path: " + file);
 			}
 			String username = sessionService.getAllSessionObjects().get("username").toString();
 			List<String> roles = (List<String> ) sessionService.getAllSessionObjects().get("roles");
@@ -261,7 +264,7 @@ public class BasicRepositoryResource2 implements ISaikuRepository {
 			@FormParam("content") String content)
 	{
 		try {
-			if (file == null || file.startsWith("/") || file.startsWith(".")) {
+			if (file == null || file.startsWith("/") || file.equals(Acl.SAIKUACCESS_FILE)) {
 				throw new IllegalArgumentException("Path cannot be null or start with \"/\" or \".\" - Illegal Path: " + file);
 			}
 
@@ -305,7 +308,7 @@ public class BasicRepositoryResource2 implements ISaikuRepository {
 			@QueryParam("file") String file)
 	{
 		try {
-			if (file == null || file.startsWith("/") || file.startsWith(".")) {
+			if (file == null || file.startsWith("/") || file.equals(Acl.SAIKUACCESS_FILE)) {
 				throw new IllegalArgumentException("Path cannot be null or start with \"/\" or \".\" - Illegal Path: " + file);
 			}
 	
@@ -336,10 +339,10 @@ public class BasicRepositoryResource2 implements ISaikuRepository {
 	public Response moveResource(@FormParam("source") String source, @FormParam("target") String target)
 	{
 		try {
-			if (source == null || source.startsWith("/") || source.startsWith(".")) {
+			if (source == null || source.startsWith("/") || source.equals(Acl.SAIKUACCESS_FILE)) {
 				throw new IllegalArgumentException("Path cannot be null or start with \"/\" or \".\" - Illegal Path: " + source);
 			}
-			if (target == null || target.startsWith("/") || target.startsWith(".")) {
+			if (target == null || target.startsWith("/") || target.equals(Acl.SAIKUACCESS_FILE)) {
 				throw new IllegalArgumentException("Path cannot be null or start with \"/\" or \".\" - Illegal Path: " + target);
 			}
 			
@@ -504,10 +507,10 @@ public class BasicRepositoryResource2 implements ISaikuRepository {
 		
 	}
 	
-	private List<IRepositoryObject> getRepositoryObjects(FileObject root, String fileType) throws Exception {
+	private List<IRepositoryObject> getRepositoryObjects(FileObject root, String fileType, boolean showhidden) throws Exception {
 		List<IRepositoryObject> repoObjects = new ArrayList<IRepositoryObject>();
 		for (FileObject file : root.getChildren()) {
-			if (!file.isHidden()) {
+			if (!file.getName().getBaseName().equals(Acl.SAIKUACCESS_FILE) && (showhidden || !file.isHidden())) {
 				String filename = file.getName().getBaseName();
 				String relativePath = repo.getName().getRelativeName(file.getName());
 
@@ -524,7 +527,7 @@ public class BasicRepositoryResource2 implements ISaikuRepository {
 						repoObjects.add(new RepositoryFileObject(filename, "#" + relativePath, extension, relativePath, acls));
 					}
 					if (file.getType().equals(FileType.FOLDER)) { 
-						repoObjects.add(new RepositoryFolderObject(filename, "#" + relativePath, relativePath, acls, getRepositoryObjects(file, fileType)));
+						repoObjects.add(new RepositoryFolderObject(filename, "#" + relativePath, relativePath, acls, getRepositoryObjects(file, fileType, showhidden)));
 					}
 					Collections.sort(repoObjects, new Comparator<IRepositoryObject>() {
 
