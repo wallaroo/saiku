@@ -50,6 +50,7 @@ import org.olap4j.Scenario;
 import org.olap4j.impl.IdentifierParser;
 import org.olap4j.mdx.IdentifierNode;
 import org.olap4j.mdx.IdentifierSegment;
+import org.olap4j.mdx.ParseTreeNode;
 import org.olap4j.mdx.ParseTreeWriter;
 import org.olap4j.mdx.SelectNode;
 import org.olap4j.mdx.parser.impl.DefaultMdxParserImpl;
@@ -359,17 +360,20 @@ public class OlapQueryService implements Serializable {
 		return execute(queryName, formatter);
 	}
 
-	public List<SaikuMember> getResultMetadataMembers(String queryName, boolean preferResult, String dimensionName, String hierarchyName, String levelName) {
+	public List<SimpleCubeElement> getResultMetadataMembers(String queryName, boolean preferResult, String dimensionName, String hierarchyName, String levelName, String searchString, int searchLimit) {
 		IQuery query = getIQuery(queryName);
 		CellSet cs = query.getCellset();
-		List<SaikuMember> members = new ArrayList<SaikuMember>();
+		List<SimpleCubeElement> members = new ArrayList<SimpleCubeElement>();
 		Set<Level> levels = new HashSet<Level>();
+		boolean search = StringUtils.isNotBlank(searchString);
+		preferResult = (preferResult && !search);
+		searchString = search ? searchString.toLowerCase() : null;
 
 		if (cs != null && preferResult) {
 			for (CellSetAxis axis : cs.getAxes()) {
 				int posIndex = 0;
 				for (Hierarchy h : axis.getAxisMetaData().getHierarchies()) {
-					if (h.getUniqueName().equals(hierarchyName)) {
+					if (h.getUniqueName().equals(hierarchyName) || h.getName().equals(hierarchyName)) {
 						log.debug("Found hierarchy in the result: " + hierarchyName);
 						if (h.getLevels().size() == 1) {
 							break;
@@ -380,12 +384,12 @@ public class OlapQueryService implements Serializable {
 							if (!m.getLevel().getLevelType().equals(Type.ALL)) {
 								levels.add(m.getLevel());
 							}
-							if (m.getLevel().getUniqueName().equals(levelName)) {
+							if (m.getLevel().getUniqueName().equals(levelName) || m.getLevel().getName().equals(levelName)) {
 								mset.add(m);
 							}
 						}
 
-						members = ObjectUtil.convertMembers(mset);
+						members = ObjectUtil.convert2Simple(mset);
 						Collections.sort(members, new SaikuUniqueNameComparator());
 
 						break;
@@ -397,9 +401,8 @@ public class OlapQueryService implements Serializable {
 
 		}
 		if (cs == null || !preferResult || members.size() == 0 || levels.size() == 1) {
-			members = olapDiscoverService.getLevelMembers(query.getSaikuCube(), dimensionName, hierarchyName, levelName);
+			members = olapDiscoverService.getLevelMembers(query.getSaikuCube(), dimensionName, hierarchyName, levelName, searchString, searchLimit);
 		}
-
 		return members;
 	}
 
@@ -462,8 +465,21 @@ public class OlapQueryService implements Serializable {
 			final OlapConnection con = olapDiscoverService.getNativeConnection(cube.getConnectionName()); 
 			stmt = con.createStatement();
 
+			SelectNode sn = (new DefaultMdxParserImpl().parseSelect(getMDXQuery(queryName)));
 			String select = null;
 			StringBuffer buf = new StringBuffer();
+			if (sn.getWithList() != null && sn.getWithList().size() > 0) {
+	            buf.append("WITH \n");
+	            StringWriter sw = new StringWriter();
+	            ParseTreeWriter ptw = new ParseTreeWriter(sw);
+	            final PrintWriter pw = ptw.getPrintWriter();
+	            for (ParseTreeNode with : sn.getWithList()) {
+	                with.unparse(ptw);
+	                pw.println();
+	            }
+	            buf.append(sw.toString());
+			}
+			
 			buf.append("SELECT (");
 			for (int i = 0; i < cellPosition.size(); i++) {
 				List<Member> members = cs.getAxes().get(i).getPositions().get(cellPosition.get(i)).getMembers();
@@ -478,7 +494,7 @@ public class OlapQueryService implements Serializable {
 			buf.append(") ON COLUMNS \r\n");
 			buf.append("FROM " + cube.getCubeName() + "\r\n");
 
-			SelectNode sn = (new DefaultMdxParserImpl().parseSelect(getMDXQuery(queryName))); 
+			 
 			final Writer writer = new StringWriter();
 			sn.getFilterAxis().unparse(new ParseTreeWriter(new PrintWriter(writer)));
 			if (StringUtils.isNotBlank(writer.toString())) {

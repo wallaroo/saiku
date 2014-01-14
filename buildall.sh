@@ -17,8 +17,6 @@ git pull
 mvn -U clean package install:install-file -Dfile=target/saiku-ui-2.6-SNAPSHOT.war  -DgroupId=org.saiku -DartifactId=saiku-ui -Dversion=MONDRIAN4-SNAPSHOT -Dpackaging=war
 cd ../saiku-server
 mvn -U clean package
-cd ../saiku-bi-platform-plugin-util
-mvn -U clean install
 cd ../saiku-bi-platform-plugin
 mvn -U clean package
 cd ../saiku-bi-platform-plugin-p5
