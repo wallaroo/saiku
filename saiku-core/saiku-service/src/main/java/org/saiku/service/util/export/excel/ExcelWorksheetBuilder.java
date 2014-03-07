@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.poi.hssf.usermodel.HSSFPalette;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.Cell;
@@ -45,7 +46,7 @@ import org.slf4j.LoggerFactory;
  */
 
 public class ExcelWorksheetBuilder {
-
+	
     private static final String BASIC_SHEET_FONT_FAMILY = "Arial";
     private static final short BASIC_SHEET_FONT_SIZE = 11;
     private static final String EMPTY_STRING = "";
@@ -69,16 +70,17 @@ public class ExcelWorksheetBuilder {
     private Properties cssColorCodesProperties;
     
     private HSSFPalette customColorsPalette;
+	private ExcelBuilderOptions options;
     
     private static final Logger log = LoggerFactory.getLogger(ExcelWorksheetBuilder.class);
 
-    public ExcelWorksheetBuilder(CellDataSet table, List<SaikuDimensionSelection> filters, String sheetName) {
-
-        init(table, filters, sheetName);
+    public ExcelWorksheetBuilder(CellDataSet table, List<SaikuDimensionSelection> filters, ExcelBuilderOptions options) {
+        init(table, filters, options);
     }
 
-    protected void init(CellDataSet table, List<SaikuDimensionSelection> filters, String sheetName) {
+    protected void init(CellDataSet table, List<SaikuDimensionSelection> filters, ExcelBuilderOptions options) {
 
+    	this.options = options;
         queryFilters = filters;
         if ("xls".equals(SaikuProperties.webExportExcelFormat)) {
         	HSSFWorkbook wb = new HSSFWorkbook();
@@ -95,7 +97,7 @@ public class ExcelWorksheetBuilder {
         CreationHelper createHelper = excelWorkbook.getCreationHelper();
 
         colorCodesMap = new HashMap<String, Integer>();
-        this.sheetName = sheetName;
+        this.sheetName = options.sheetName;
         rowsetHeader = table.getCellSetHeaders();
         rowsetBody = table.getCellSetBody();
 
@@ -187,11 +189,12 @@ public class ExcelWorksheetBuilder {
 
         int headerWidth = rowsetHeader.length;
 
-        // Autosize columns
-        for (int i=0; i<rowsetBody[0].length; i++) {
-            workbookSheet.autoSizeColumn(i);
+        if (rowsetBody != null && rowsetBody.length > 0) {
+	        // Autosize columns
+	        for (int i=0; i < rowsetBody[0].length; i++) {
+	            workbookSheet.autoSizeColumn(i);
+	        }
         }
-
         // Freeze the header columns
         workbookSheet.createFreezePane( 0, startRow + headerWidth, 0, startRow + headerWidth );
     }
@@ -200,7 +203,11 @@ public class ExcelWorksheetBuilder {
 
         
         // Main Workbook Sheet
-        workbookSheet = excelWorkbook.createSheet(this.sheetName);
+    	if (StringUtils.isNotBlank(options.sheetName)) {
+    		workbookSheet = excelWorkbook.createSheet(this.sheetName);
+    	} else {
+    		workbookSheet = excelWorkbook.createSheet();
+    	}
     
         initSummarySheet();
 
@@ -214,14 +221,14 @@ public class ExcelWorksheetBuilder {
 
         int row = 1;
 
-        Row sheetRow = summarySheet.createRow((short) row);
+        Row sheetRow = summarySheet.createRow((int) row);
         Cell cell = sheetRow.createCell(0);
         String todayDate = (new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")).format(new Date());
         cell.setCellValue("Export date and time: " + todayDate);
         summarySheet.addMergedRegion(new CellRangeAddress(1, 1, 0, 2));
         row = row+2;
 
-        sheetRow = summarySheet.createRow((short) row);
+        sheetRow = summarySheet.createRow((int) row);
         cell = sheetRow.createCell(0);
         cell.setCellValue("Dimension");
         cell = sheetRow.createCell(1);
@@ -232,7 +239,7 @@ public class ExcelWorksheetBuilder {
 
         for (SaikuDimensionSelection item : queryFilters) {
             for (SaikuSelection s : item.getSelections()) {
-                sheetRow = summarySheet.createRow((short) row);
+                sheetRow = summarySheet.createRow((int) row);
                 cell = sheetRow.createCell(0);
                 cell.setCellValue(s.getDimensionUniqueName());
                 cell = sheetRow.createCell(1);
@@ -245,7 +252,7 @@ public class ExcelWorksheetBuilder {
 
         row += 2;
 
-        sheetRow = summarySheet.createRow((short) row);
+        sheetRow = summarySheet.createRow((int) row);
         cell = sheetRow.createCell(0);
         cell.setCellValue("Export made using Saiku OLAP client.");
         summarySheet.addMergedRegion(new CellRangeAddress(row, row, 0, 10));
@@ -264,11 +271,11 @@ public class ExcelWorksheetBuilder {
 
         for (int x = 0; x < rowsetBody.length; x++) {
 
-            sheetRow = workbookSheet.createRow((short) x + startingRow);
+            sheetRow = workbookSheet.createRow((int) x + startingRow);
             for (int y = 0; y < rowsetBody[x].length; y++) {
                 cell = sheetRow.createCell(y);
                 String value = rowsetBody[x][y].getFormattedValue();
-                if (value == null) {
+                if (value == null && options.repeatValues) {
                     // If the row cells has a null values it means the value is repeated in the data internally
                     // but not in the interface. To properly format the Excel export file we need that value so we
                     // get it from the same position in the prev row
@@ -298,8 +305,14 @@ public class ExcelWorksheetBuilder {
             // the format string can contain macro values such as "Standard" from mondrian.util.Format
             // try and look it up, otherwise use the given one
             formatString = FormatUtil.getFormatString(formatString);
-            short dataFormat = fmt.getFormat(formatString);
-            numberCSClone.setDataFormat(dataFormat);
+            try {
+            	short dataFormat = fmt.getFormat(formatString);
+            	numberCSClone.setDataFormat(dataFormat);
+            } catch (Exception e) {
+            	// we tried to apply the mondrian format, but probably failed, so lets use the standard one
+            	//short dataFormat = fmt.getFormat(SaikuProperties.webExportExcelDefaultNumberFormat);
+            	//numberCSClone.setDataFormat(dataFormat);
+            }
 
             // Check for cell background
             Map<String, String> properties = ((DataCell) rowsetBody[x][y]).getProperties();
@@ -397,7 +410,7 @@ public class ExcelWorksheetBuilder {
 
         for (x = 0; x < rowsetHeader.length; x++) {
 
-            sheetRow = workbookSheet.createRow((short) x + startRow);
+            sheetRow = workbookSheet.createRow((int) x + startRow);
 
             nextHeader = EMPTY_STRING;
             isLastColumn = false;
