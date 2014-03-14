@@ -190,7 +190,6 @@ public class BasicRepositoryResource2 implements ISaikuRepository {
 	
 	
 	@POST
-	@Produces({"application/json" })
 	@Path("/resource/acl")
 	public Response setResourceAcl(@FormParam("file") String file, @FormParam("acl") String aclEntry) {
 		try {

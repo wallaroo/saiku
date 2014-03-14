@@ -69,6 +69,7 @@ public class DataSourceResource {
      */
     @DELETE
 	@Path("/{datasource}")
+    @Produces(MediaType.APPLICATION_JSON)
 	public Status deleteDatasource(@PathParam("datasource") String datasourceName){
     	datasourceService.removeDatasource(datasourceName);
 		return(Status.GONE);

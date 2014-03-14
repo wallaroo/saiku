@@ -155,7 +155,7 @@ public class ClassPathResourceDatasourceManager implements IDatasourceManager {
 			if (uri != null) {
 				// seems like we don't have to do this anymore
 				//uri.toString().endsWith(String.valueOf(File.separatorChar))) {
-				uri += datasourceName;
+				uri += "/" + datasourceName;
 				File dsFile = new File(new URI(uri));
 				if (dsFile.delete()) {
 					datasources.remove(datasourceName);
