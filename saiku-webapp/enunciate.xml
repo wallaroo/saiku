@@ -12,7 +12,7 @@
 		<docs>
 			<war docsDir="serverdocs" />
 		</docs>
-		<spring-app contextConfigLocation="${saiku.applicationcontext}">
+		<spring-app contextConfigLocation="classpath:conf/applicationContext.xml">
 			<springImport file="src/main/web/applicationContext.xml" />
 			<springImport file="src/main/web/saiku-beans.xml" />
 			<springImport file="src/main/web/spring-servlet.xml" />

@@ -5,12 +5,11 @@
 <web-app>
 
 	<display-name>saiku</display-name>
-
+	
 	<context-param>
 		<param-name>encoding</param-name>
 		<param-value>UTF-8</param-value>
 	</context-param>
-	
 	<session-config>
 		<session-timeout>60</session-timeout>
 	</session-config>
